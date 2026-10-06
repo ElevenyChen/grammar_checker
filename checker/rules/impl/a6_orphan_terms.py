@@ -16,6 +16,7 @@ months, display and section words, the draft's own heading texts ("Analytic Plan
 H labels (protected), author names (protected). Hyphen and en-dash compounds are joined
 ("chi–square test", "signed–rank tests"), so a fragment is never reported as a term.
 Drop rather than guess: a term that also occurs before Results in any case form is not flagged.
+Overlapping hits at one spot ("Wilcoxon" and "Wilcoxon test") are reported once, longest first.
 """
 from __future__ import annotations
 
@@ -158,11 +159,16 @@ def orphan_terms(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     occurrences: dict[int, int] = {}
     hits = [(t, v) for t, v in first_cap.items() if t not in lower_seen_before_results]
     hits += list(first_bigram.items())
-    for term, (s, a, b) in sorted(hits, key=lambda h: h[1][1]):
+    taken: list[tuple[int, int]] = []
+    # longest first, so "Wilcoxon test" wins over "Wilcoxon" at the same spot
+    for term, (s, a, b) in sorted(hits, key=lambda h: (h[1][1], -(h[1][2] - h[1][1]))):
         if not s.section.kind.after_results:
             continue
         if term.lower() in known or _defined_here(doc.text, a, b):
             continue
+        if any(a < tb and ta < b for ta, tb in taken):
+            continue
+        taken.append((a, b))
         occ = occurrences.get(s.doc_index, 0)
         occurrences[s.doc_index] = occ + 1
         out.append(emit.finding(

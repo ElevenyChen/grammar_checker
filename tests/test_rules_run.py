@@ -94,7 +94,7 @@ def test_a6_known_and_defined_terms(tmp_path, nlp):
     text = ("# T\n\n## Methods\n\nWe count rules.\n\n## Results\n\n"
             "The 95% CI excludes zero during COVID. OR = Odds Ratio. A Wilcoxon test agrees.\n")
     terms = {f.extra["term"] for f in _report(tmp_path, text, nlp).findings if f.rule_id == "A6"}
-    assert "Wilcoxon" in terms
+    assert terms & {"Wilcoxon", "wilcoxon test"} and len(terms & {"Wilcoxon", "wilcoxon test"}) == 1
     assert not terms & {"CI", "COVID", "Odds Ratio"}
 
 

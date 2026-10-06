@@ -37,7 +37,7 @@ STEP_STAGES = {
     1: [RULES_STAGE],
     2: ["sentence checks (1.3)", "paragraph checks (1.4)"],
     3: [RULES_STAGE],
-    4: ["format checks (1.7)", "reference check (1.9)", RULES_STAGE],
+    4: ["format checks (1.7)", "reference check (1.9)"],   # no appendix row is step 4
     "soft": ["approximate checks (1.5)"],
 }
 
