@@ -11,6 +11,6 @@ from checker.rules.loader import RuleRow
 from checker.rules.registry import rule
 
 
-@rule("B9.7")
+@rule("B9.7", stub=True)
 def term_in_topic(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError

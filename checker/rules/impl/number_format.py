@@ -1,4 +1,4 @@
-"""Appendix format rows that are 'both present' checks over the whole body (scope 1.7).
+"""Appendix rows B7.4–B7.6 (advisor-specific format rows; scope 1.7) that are 'both present' checks over the whole body (scope 1.7).
 
 - Chi-squared vs χ²: both spellings present -> one Finding per minority occurrence.
 - Thousands separators: \\d{4,} without comma and \\d,\\d{3} both present (exclude years 19xx/20xx,
@@ -16,16 +16,16 @@ from checker.rules.loader import RuleRow
 from checker.rules.registry import rule
 
 
-@rule("F.CHI")
+@rule("B7.4", stub=True)
 def chi_squared_mixed(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError
 
 
-@rule("F.THOUSANDS")
+@rule("B7.5", stub=True)
 def thousands_mixed(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError
 
 
-@rule("F.LEADZERO")
+@rule("B7.6", stub=True)
 def leading_zero(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError

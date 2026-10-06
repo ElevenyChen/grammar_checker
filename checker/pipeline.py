@@ -35,7 +35,7 @@ RULES_STAGE = "word rules and claim verbs (1.1, 1.2)"
 # which stages feed which report step; a step whose stages all failed to run says "Not run"
 STEP_STAGES = {
     1: [RULES_STAGE],
-    2: ["sentence checks (1.3)", "paragraph checks (1.4)", RULES_STAGE],
+    2: ["sentence checks (1.3)", "paragraph checks (1.4)"],
     3: [RULES_STAGE],
     4: ["format checks (1.7)", "reference check (1.9)", RULES_STAGE],
     "soft": ["approximate checks (1.5)"],
@@ -136,7 +136,13 @@ def analyse(path: Path, config: Config, decisions_path: Path | None = None,
         from checker.rules import loader, regex_rules, registry
         table = loader.load(config.paths.polishing)
         out = regex_rules.run(doc, table, config)
-        return out + registry.run_python_rows(doc, table, config)
+        python_findings, unbuilt_rows = registry.run_python_rows(doc, table, config)
+        for r in unbuilt_rows:
+            what = r.note or r.pattern[:50]
+            unbuilt.append(NotChecked("checker", f"rule {r.id} ({what}): not built yet", "build step 3"))
+        stats["rule_table"] = {"rows": len(table.rows), "regex": len(table.regex_rows),
+                               "python": len(table.python_rows), "unbuilt": [r.id for r in unbuilt_rows]}
+        return out + python_findings
 
     def checks_stage(module: str) -> Callable[[], list[Finding]]:
         def run() -> list[Finding]:

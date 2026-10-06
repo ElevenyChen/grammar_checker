@@ -19,6 +19,6 @@ def parse_sets(pattern: str) -> list[tuple[int, set[str]]]:
     raise NotImplementedError
 
 
-@rule("B9.8")
+@rule("B9.8a", "B9.8b", stub=True)
 def elegant_variation(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError

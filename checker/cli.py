@@ -130,12 +130,28 @@ def cmd_comments(args, config: Config) -> int:
 
 def cmd_rules(args, config: Config) -> int:
     from checker.rules import loader, registry
-    import checker.rules.impl  # noqa: F401
     table = loader.load(config.paths.polishing)
+    registry._load_impl()
+    missing = 0
     for r in table.rows + table.skip_rows:
-        kind = "regex" if r.is_regex else ("python ✓" if r.id in registry.RULES else "python ✗ MISSING")
-        print(f"{r.id:12} step{int(r.step)} {str(r.severity and r.severity.value):5} {str(r.action and r.action.value):7} {kind:16} {r.pattern[:60]}")
-    return 0
+        if r.is_skip:
+            kind = "skip"
+        elif r.is_regex:
+            kind = "regex"
+        elif r.id not in registry.RULES:
+            kind, missing = "python MISSING", missing + 1
+        elif r.id in registry.STUBS:
+            kind = "python (stub)"
+        else:
+            kind = "python"
+        sev = r.severity.value if r.severity else "-"
+        act = r.action.value if r.action else "skip"
+        quals = "".join(q for q, on in ((" cs", r.case_sensitive), (" ¶1", r.paragraph_start), (f" {r.pos}", bool(r.pos))) if on)
+        print(f"{r.id:8} step{int(r.step)} {sev:5} {act:7} {kind:15}{quals:8} {r.pattern[:58]}")
+    stubs = sum(1 for r in table.python_rows if r.id in registry.STUBS)
+    print(f"\n{len(table.rows)} rows: {len(table.regex_rows)} regex, {len(table.python_rows)} python "
+          f"({stubs} stub), {len(table.skip_rows)} skip; {missing} missing")
+    return 1 if missing else 0
 
 
 COMMANDS = {"run": cmd_run, "refs": cmd_refs, "apply": cmd_apply, "stats": cmd_stats,

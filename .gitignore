@@ -15,3 +15,6 @@ decisions.json
 # private notes: never upload
 Paper Workflow*.md
 advisor_comments_digest.md
+
+# calibration notes quote the draft: keep local
+local/

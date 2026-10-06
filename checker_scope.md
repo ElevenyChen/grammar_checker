@@ -192,6 +192,7 @@ Files not fed to the windows: `advisor_comments_digest.md` (evidence, not rules)
 - 2026-10-06 — The page is a decision panel, not an editor. It shows the detected text and the decision state; no before/after diff. `apply` is the only writer; Word Compare gives tracked changes.
 - 2026-10-06 — `check_refs.py` folded in as step 4 with cached Crossref lookups and a two-way orphan match. Deterministic lookup is not the API the API-free decision excludes.
 - 2026-10-06 — Not a Grammarly clone. Linter model: only table-specified proposals, no trained corrector. Only 1.5 needs labelled data.
+- 2026-10-06 — First false-positive count on the PSJ draft: accuracy problems were rows ignoring part of speech, not missing vocabulary. Rule rows may take `(verb)` / `(adverb)` qualifiers (spaCy tags). A6 gets a short known-terms exemption list in `llm_polishing.md`; it only removes flags, so it is not the term dictionary §4 excludes. No synonym package.
 
 ## 7. UI — decision panel
 

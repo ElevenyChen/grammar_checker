@@ -151,95 +151,125 @@ Hedge/intensifier calibration is not a Williams table — hedges stay in A5; int
 
 ## Appendix — machine view
 
-Format: `step | severity | action | pattern | replacement`. Regex is case-insensitive unless noted. `flag` rows return the sentence.
+Format: `id | step | severity | action | pattern | replacement`. Regex is case-insensitive unless noted. `flag` rows return the sentence; their last column is a note.
+Ids follow the module sections above (A1–A7, B1–B9); `B.*` rows have no module section. A replacement with ` / ` offers candidates the human picks from. Ids are what reports, decisions and the calibration count key on: do not renumber a row, retire it.
+
+Qualifiers at the end of the pattern column keep a row a regex and narrow it:
+- `(case-sensitive)`: no re.I.
+- `(paragraph start)`: only a paragraph's first sentence.
+- `(verb)`: keep a hit only if a word in it is used as a verb (spaCy), not as a modifier: *established rules*, *growth–driven*, *communities established before* do not fire.
+- `(adverb)`: keep a hit only if the word is tagged as an adverb: *likely*, *apply*, *family* do not fire.
+A named group `(?P<hit>…)` sets the reported span when the pattern has to look at the whole sentence (A4.2). Any other prose in the pattern column means the row is implemented in Python under its id (`checker/rules/impl`).
+
+Changes after the first false-positive count (2026-10-06, PSJ draft): A1.T3–T5 and B2.11 take `(verb)`; B3.3 takes `(adverb)` and skips restrictive adverbs (*only, nearly, exactly, roughly, partly*); A4.2 checks the whole sentence for a test or statistic, not only the text after the word; B.NOUNS moves from regex (any four words before the head) to a POS row.
 
 ```
-1 | gate  | flag    | \b(prove[sd]?|debunk(s|ed)?|definitively)\b                       |
-1 | gate  | flag    | \b(demonstrat(e|es|ed)|establish(es|ed)|confirm(s|ed)|reveal(s|ed)|validat(e|es|ed))\b  | T3 — check alternatives addressed
-1 | gate  | flag    | \b(explain(s|ed)|caus(e|es|ed)|driv(e|es|en)|leads? to|results? in)\b | T4 — check causal design
-1 | gate  | flag    | \b(integrat(e|es|ed|ing)|reconcil(e|es|ed)|unif(y|ies|ied)|synthesiz(e|es|ed)|bridg(e|es|ed))\b | T5 — check framework + test
-1 | gate  | flag    | \bH\d[^.]*(no (systematic )?difference|does not (interact|differ)|remains? constant|independent of) | label H0
-1 | gate  | flag    | \b(crucial(ly)?|critical(ly)?|essential(ly)?|vital(ly)?|important(ly)?|notabl[ey]|interestingly|remarkably)\b |
-1 | gate  | flag    | \bsignificant(ly)?\b(?![^.]*\b(p\s*[<=>]|CI|test|statistic))          | non-statistical use
-1 | gate  | flag    | \b(most|primarily|mainly|largely|generally)\b[^.]*\b(most|primarily|mainly|largely|generally)\b | stacked hedge
-1 | gate  | flag    | \b(may|might|can|could)\s+(often|potentially|possibly|sometimes)\b   | stacked hedge
-1 | gate  | flag    | \bseems? to (suggest|indicate)\b                                     |
-1 | gate  | flag    | first occurrence after "Results" of [A-Z][a-z]+ (analysis|model|test|procedure) | orphan term (approx.)
-1 | gate  | flag    | shared 8-gram between paragraphs                                     | repeated passage
+A1.P      | 1 | gate  | flag    | \b(prove[sd]?|debunk(s|ed)?|definitively)\b                            |
+A1.T3     | 1 | gate  | flag    | \b(demonstrat(e|es|ed)|establish(es|ed)|confirm(s|ed)|reveal(s|ed)|validat(e|es|ed))\b (verb) | T3 — check alternatives addressed
+A1.T4     | 1 | gate  | flag    | \b(explain(s|ed)|caus(e|es|ed)|driv(e|es|en)|leads? to|results? in)\b (verb) | T4 — check causal design
+A1.T5     | 1 | gate  | flag    | \b(integrat(e|es|ed|ing)|reconcil(e|es|ed)|unif(y|ies|ied)|synthesiz(e|es|ed)|bridg(e|es|ed))\b (verb) | T5 — check framework + test
+A2        | 1 | gate  | flag    | \bH\d[^.]*(no (systematic )?difference|does not (interact|differ)|remains? constant|independent of) | label H0
+A4.1      | 1 | gate  | flag    | \b(crucial(ly)?|critical(ly)?|essential(ly)?|vital(ly)?|important(ly)?|notabl[ey]|interestingly|remarkably)\b |
+A4.2      | 1 | gate  | flag    | ^(?!.*(\bp\s*[<=>]|\bCI\b|\btests?\b|\bstatistic|χ²|=\s*[-–]?\.?\d)).*?\b(?P<hit>significant(ly)?)\b | non-statistical use (sentence reports no test or statistic)
+A5.1      | 1 | gate  | flag    | \b(most|primarily|mainly|largely|generally)\b[^.]*\b(most|primarily|mainly|largely|generally)\b | stacked hedge
+A5.2      | 1 | gate  | flag    | \b(may|might|can|could)\s+(often|potentially|possibly|sometimes)\b     | stacked hedge
+A5.3      | 1 | gate  | flag    | \bseems? to (suggest|indicate)\b                                       |
+A6        | 1 | gate  | flag    | first occurrence after "Results" of [A-Z][a-z]+ (analysis|model|test|procedure) | orphan term (approx.)
+A7        | 1 | gate  | flag    | shared 8-gram between paragraphs                                       | repeated passage
 
-3 | gate  | replace | \bevol(ve|ves|ved|ving|ution)\b                                     | develop / change
-3 | gate  | replace | \b(Institutional Layering Theory|Punctuated Equilibrium Theory)\b (case-sensitive) | lowercase
-3 | gate  | flag    | ^(It is|There (is|are))\b                                            | empty opener (B5; see B9.2 exception)
-3 | gate  | flag    | \b(Figure|Table) \d+ (shows|illustrates|demonstrates|presents) that\b | buried main clause
-3 | gate  | flag    | \b\w+(tion|sion|ment|ance|ence|ysis|ity)\b[^.]{0,40}\b(was|were|is|are) (due to|because of|a (consequence|result) of|attributable to)\b[^.]{0,40}\b\w+(tion|sion|ment|ance|ence|ysis|ity)\b | B9.4 hidden causal link → two clauses
-3 | gate  | flag    | \b(resulted from|stemmed from|arose from)\b (both sides nominalized) | B9.4 variant
-3 | gate  | flag    | ≥3 of {change, modification, revision, amendment} in one section   | B9.8 elegant variation
-3 | gate  | flag    | ≥2 of {remove, delete, repeal} / {add, introduce, adopt} / {community, subreddit, group} in one section | B9.8
-3 | gate  | flag    | paragraph-initial sentence: last 3–4 content words absent from rest of paragraph (stem match) | B9.9 issue theme unmet (approx.)
-3 | style | flag    | \b(conduct|perform|make|provide|carry out|undertake|engage in)(s|ed|ing)?\s+(a|an|the)?\s*\w+(tion|sion|ment|ance|ence|ysis)\b | B9.1 nominalization → verb
-3 | style | flag    | ^There (is|are|was|were) (a|an|no|some|little)?\s*\w+(tion|sion|ment|ance|ence|ysis)\b | B9.2 — keep if next sentence develops the noun
-3 | style | replace | ^The (intention|aim|purpose|expectation|goal) of (\w+) (is|was) to\b | B9.3 → "\2 (intends|aims|expects) to"
-3 | style | flag    | (as (noted|shown|discussed|mentioned) (above|earlier|below|previously)|as our (analysis|results?|data) shows?|it should be noted)\.$ | B9.6 sentence-final metadiscourse
-3 | style | flag    | defined term (from glossary list) whose first occurrence is within first 6 words of its sentence | B9.7 term in topic position
-3 | style | replace | \b(each and every|first and foremost|any and all|basic and fundamental|full and complete|true and accurate|various and sundry)\b | B9.10 first word only
-3 | style | delete  | \b(past|prior) (history|experience)\b → history/experience; \bend result\b → result; \bfinal outcome\b → outcome; \bfuture plans?\b → plan; \bconsensus of opinion\b → consensus; \bcompletely finish\b → finish; \bsudden crisis\b → crisis; \badvance planning\b → planning | B9.11
-3 | ---   | skip    | ^(This|These|That|Those|Such|The same) \w+(tion|sion|ment|ance|ence|ysis|ity|pattern|result|shift)\b | B9.5 backward-referring nominalization: suppress B9.1–B9.3 hits on this subject
-3 | style | replace | \bin order to\b                                                      | to
-3 | style | replace | \ba number of\b                                                      | many
-3 | style | replace | \bthe (vast )?majority of\b                                          | most
-3 | style | replace | \b(due to|owing to) the fact that\b                                 | because
-3 | style | replace | \bon account of\b                                                    | because
-3 | style | replace | \bin the event that\b                                                | if
-3 | style | replace | \bprior to\b                                                         | before
-3 | style | replace | \bsubsequent to\b                                                    | after
-3 | style | replace | \bat this point in time\b                                            | now
-3 | style | replace | \bon a daily basis\b                                                 | daily
-3 | style | replace | \bin close proximity\b                                               | near
-3 | style | replace | \bapproximately\b                                                    | about
-3 | style | replace | \ba considerable amount of\b                                         | much
-3 | style | replace | \bwhether or not\b                                                   | whether
-3 | style | replace | \b(despite|in spite of) the fact that\b                             | although
-3 | style | flag    | \bin terms of\b                                                      | delete or "about"
-3 | style | replace | \bwith (regard|respect) to\b                                        | about
-3 | style | replace | \bfor the purpose of\b                                               | for
-3 | style | replace | \bin the absence of\b                                                | without
-3 | style | replace | \b(has|have) the capacity to\b                                       | can
-3 | style | replace | \b(is|are|was|were) able to\b                                        | can / could
-3 | style | replace | \bthe question as to whether\b                                       | whether
-3 | style | flag    | \bthe fact that\b                                                    | delete
-3 | style | replace | \butiliz(e|es|ed|ing)\b                                              | use
-3 | style | replace | \bemploy(s|ed|ing)?\b(?= (a|an|the|data|method|model))              | use
-3 | style | replace | \belucidat(e|es|ed)\b                                                | explain
-3 | style | replace | \bfacilitat(e|es|ed)\b                                               | help / ease
-3 | style | replace | \bmethodolog(y|ies)\b                                                | method(s)
-3 | style | replace | \bascertain(s|ed)?\b                                                 | find out
-3 | style | replace | \bendeavou?r(s|ed)?\b                                                | try
-3 | style | replace | \binitiat(e|es|ed)\b                                                 | begin
-3 | style | replace | \bterminat(e|es|ed)\b                                                | end
-3 | style | replace | \boptimum\b                                                          | best
-3 | style | replace | \bimpact(s|ed)?\b (verb)                                             | affect
-3 | style | replace | \breferred to as\b                                                   | called
-3 | style | delete  | \b(very|actually|completely|totally|quite|basically)\b               |
-3 | style | delete  | \b(needless to say|it is important to note that|it should be emphasized that|it is worth pointing out that)\b |
-3 | style | flag    | \b\w+ly\b                                                            | adverb
-3 | style | flag    | \bwe (found|find|argue|show|note) that\b                            | metadiscourse (mid-sentence; Intro/Conclusion announcements exempt)
-3 | style | flag    | \b(to conclude|in conclusion)\b                                      |
-3 | style | flag    | \bour (initial )?hypothesis was that\b                              |
-3 | style | flag    | ^(First|Next|Then|After|Also|Another|In addition|Additionally)\b (paragraph start) |
-3 | style | flag    | \bof\b (density > 1 per 12 words)                                    | of-construction
-3 | style | flag    | (\b[A-Za-z]+\b\s){4,}\b(model|system|analysis|approach)\b            | noun string
-3 | style | flag    | \b(was|were|is|are|been) \w+ed by\b                                  | passive with agent — judge by B9.H4, not by count
-3 | style | flag    | \b(plays? a role in|take-home message|tip of the iceberg|level playing field|cutting edge|window of opportunity|the bottom line|in this day and age|food for thought|viable alternative|meaningful dialogue|at the end of the day)\b | cliché
-3 | style | flag    | \bwhile\b (non-temporal)                                             | although
-3 | style | flag    | \bsince\b (non-temporal)                                             | because
-3 | style | replace | \bdifferent than\b                                                   | different from
-3 | style | flag    | \bdownplay\b                                                         | "treat as a threat"
-3 | style | flag    | (Chi-squared|χ²) both present                                        | pick one
-3 | style | flag    | \d{4,}(?!,)  and  \d,\d{3}  both present                              | number format
-3 | style | flag    | (?<![\d.])\.\d+ where value can exceed 1                             | leading zero
+B7.1      | 3 | gate  | replace | \bevol(ve|ves|ved|ving|ution)\b                                        | develop / change
+B7.2      | 3 | gate  | replace | \b(Institutional Layering Theory|Punctuated Equilibrium Theory)\b (case-sensitive) | lowercase
+B5.1      | 3 | gate  | flag    | ^(It is|There (is|are))\b                                              | empty opener (B5; see B9.2 exception)
+B5.2      | 3 | gate  | flag    | \b(Figure|Table) \d+ (shows|illustrates|demonstrates|presents) that\b  | buried main clause
+B9.4      | 3 | gate  | flag    | \b\w+(tion|sion|ment|ance|ence|ysis|ity)\b[^.]{0,40}\b(was|were|is|are) (due to|because of|a (consequence|result) of|attributable to)\b[^.]{0,40}\b\w+(tion|sion|ment|ance|ence|ysis|ity)\b | hidden causal link → two clauses
+B9.4b     | 3 | gate  | flag    | \b(resulted from|stemmed from|arose from)\b (both sides nominalized)   | hidden causal link (variant)
+B9.8a     | 3 | gate  | flag    | ≥3 of {change, modification, revision, amendment} in one section       | elegant variation
+B9.8b     | 3 | gate  | flag    | ≥2 of {remove, delete, repeal} / {add, introduce, adopt} / {community, subreddit, group} in one section | elegant variation
+B9.9      | 3 | gate  | flag    | paragraph-initial sentence: last 3–4 content words absent from rest of paragraph (stem match) | issue theme unmet (approx.)
+B9.1      | 3 | style | flag    | \b(conduct|perform|make|provide|carry out|undertake|engage in)(s|ed|ing)?\s+(a|an|the)?\s*\w+(tion|sion|ment|ance|ence|ysis)\b | nominalization → verb
+B9.2      | 3 | style | flag    | ^There (is|are|was|were) (a|an|no|some|little)?\s*\w+(tion|sion|ment|ance|ence|ysis)\b | keep if next sentence develops the noun
+B9.3      | 3 | style | replace | ^The (intention|aim|purpose|expectation|goal) of (\w+) (is|was) to\b   | \2 intends to / \2 aims to / \2 expects to
+B9.6      | 3 | style | flag    | (as (noted|shown|discussed|mentioned) (above|earlier|below|previously)|as our (analysis|results?|data) shows?|it should be noted)\.$ | sentence-final metadiscourse
+B9.7      | 3 | style | flag    | defined term (from glossary list) whose first occurrence is within first 6 words of its sentence | term in topic position
+B9.10     | 3 | style | replace | \b(each and every|first and foremost|any and all|basic and fundamental|full and complete|true and accurate|various and sundry)\b | first word only
+B9.11a    | 3 | style | replace | \b(past|prior) history\b                                               | history
+B9.11b    | 3 | style | replace | \b(past|prior) experience\b                                            | experience
+B9.11c    | 3 | style | replace | \bend result\b                                                         | result
+B9.11d    | 3 | style | replace | \bfinal outcome\b                                                      | outcome
+B9.11e    | 3 | style | replace | \bfuture plans?\b                                                      | plan
+B9.11f    | 3 | style | replace | \bconsensus of opinion\b                                               | consensus
+B9.11g    | 3 | style | replace | \bcompletely finish\b                                                  | finish
+B9.11h    | 3 | style | replace | \bsudden crisis\b                                                      | crisis
+B9.11i    | 3 | style | replace | \badvance planning\b                                                   | planning
+B9.5      | 3 | ---   | skip    | ^(This|These|That|Those|Such|The same) \w+(tion|sion|ment|ance|ence|ysis|ity|pattern|result|shift)\b | backward-referring nominalization: suppress B9.1–B9.3 on this sentence
+B1.1      | 3 | style | replace | \bin order to\b                                                        | to
+B1.2      | 3 | style | replace | \ba number of\b                                                        | many
+B1.3      | 3 | style | replace | \bthe (vast )?majority of\b                                            | most
+B1.4      | 3 | style | replace | \b(due to|owing to) the fact that\b                                    | because
+B1.5      | 3 | style | replace | \bon account of\b                                                      | because
+B1.6      | 3 | style | replace | \bin the event that\b                                                  | if
+B1.7      | 3 | style | replace | \bprior to\b                                                           | before
+B1.8      | 3 | style | replace | \bsubsequent to\b                                                      | after
+B1.9      | 3 | style | replace | \bat this point in time\b                                              | now
+B1.10     | 3 | style | replace | \bon a daily basis\b                                                   | daily
+B1.11     | 3 | style | replace | \bin close proximity\b                                                 | near
+B1.12     | 3 | style | replace | \bapproximately\b                                                      | about
+B1.13     | 3 | style | replace | \ba considerable amount of\b                                           | much
+B1.14     | 3 | style | replace | \bwhether or not\b                                                     | whether
+B1.15     | 3 | style | replace | \b(despite|in spite of) the fact that\b                                | although
+B1.16     | 3 | style | flag    | \bin terms of\b                                                        | delete or "about"
+B1.17     | 3 | style | replace | \bwith (regard|respect) to\b                                           | about
+B1.18     | 3 | style | replace | \bfor the purpose of\b                                                 | for
+B1.19     | 3 | style | replace | \bin the absence of\b                                                  | without
+B1.20     | 3 | style | replace | \b(has|have) the capacity to\b                                         | can
+B1.21     | 3 | style | replace | \b(is|are|was|were) able to\b                                          | can / could
+B1.22     | 3 | style | replace | \bthe question as to whether\b                                         | whether
+B1.23     | 3 | style | flag    | \bthe fact that\b                                                      | delete
+B2.1      | 3 | style | replace | \butiliz(e|es|ed|ing)\b                                                | use
+B2.2      | 3 | style | replace | \bemploy(s|ed|ing)?\b(?= (a|an|the|data|method|model))                 | use
+B2.3      | 3 | style | replace | \belucidat(e|es|ed)\b                                                  | explain
+B2.4      | 3 | style | replace | \bfacilitat(e|es|ed)\b                                                 | help / ease
+B2.5      | 3 | style | replace | \bmethodolog(y|ies)\b                                                  | method(s)
+B2.6      | 3 | style | replace | \bascertain(s|ed)?\b                                                   | find out
+B2.7      | 3 | style | replace | \bendeavou?r(s|ed)?\b                                                  | try
+B2.8      | 3 | style | replace | \binitiat(e|es|ed)\b                                                   | begin
+B2.9      | 3 | style | replace | \bterminat(e|es|ed)\b                                                  | end
+B2.10     | 3 | style | replace | \boptimum\b                                                            | best
+B2.11     | 3 | style | replace | \bimpact(s|ed)?\b (verb)                                               | affect
+B2.12     | 3 | style | replace | \breferred to as\b                                                     | called
+B3.1      | 3 | style | delete  | \b(very|actually|completely|totally|quite|basically)\b                 |
+B3.2      | 3 | style | delete  | \b(needless to say|it is important to note that|it should be emphasized that|it is worth pointing out that)\b |
+B3.3      | 3 | style | flag    | \b(?!(only|nearly|exactly|roughly|partly)\b)\w+ly\b (adverb)           | adverb: delete or replace with a specific
+B4.1      | 3 | style | flag    | \bwe (found|find|argue|show|note) that\b                               | metadiscourse (mid-sentence; Intro/Conclusion announcements exempt)
+B4.2      | 3 | style | flag    | \b(to conclude|in conclusion)\b                                        |
+B4.3      | 3 | style | flag    | \bour (initial )?hypothesis was that\b                                 |
+B6        | 3 | style | flag    | ^(First|Next|Then|After|Also|Another|In addition|Additionally)\b (paragraph start) |
+B.OF      | 3 | style | flag    | \bof\b (density > 1 per 12 words)                                      | of-construction
+B.NOUNS   | 3 | style | flag    | ≥3 nouns in a row before model / system / analysis / approach (POS)    | noun string
+B.PASSIVE | 3 | style | flag    | \b(was|were|is|are|been) \w+ed by\b                                    | passive with agent — judge by B9.H4, not by count
+B8        | 3 | style | flag    | \b(plays? a role in|take-home message|tip of the iceberg|level playing field|cutting edge|window of opportunity|the bottom line|in this day and age|food for thought|viable alternative|meaningful dialogue|at the end of the day)\b | cliché
+B.WHILE   | 3 | style | flag    | \bwhile\b (non-temporal)                                               | although
+B.SINCE   | 3 | style | flag    | \bsince\b (non-temporal)                                               | because
+B.DIFF    | 3 | style | replace | \bdifferent than\b                                                     | different from
+B7.3      | 3 | style | flag    | \bdownplay\b                                                           | "treat as a threat"
+B7.4      | 3 | style | flag    | (Chi-squared|χ²) both present                                          | pick one
+B7.5      | 3 | style | flag    | \d{4,}(?!,)  and  \d,\d{3}  both present                               | number format
+B7.6      | 3 | style | flag    | (?<![\d.])\.\d+ where value can exceed 1                               | leading zero
 ```
 
 Run order inside Step 3: B9.5 skip-list first, then gate rows, then style rows. Otherwise B9.1 fires on every *This analysis…* topic.
+
+### Known terms (A6 exemptions)
+
+Terms a reader of this paper is assumed to know. A6 never reports them as orphan terms. One term per line, matched case-insensitively. Keep it short: a missing entry only means one flag you would have seen anyway.
+
+```
+CI
+SD
+SE
+COVID
+COVID-19
+```
 
 ---
 

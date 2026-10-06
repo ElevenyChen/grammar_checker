@@ -14,6 +14,6 @@ from checker.rules.loader import RuleRow
 from checker.rules.registry import rule
 
 
-@rule("B9.9")
+@rule("B9.9", stub=True)
 def first_sentence_promise(doc: Document, row: RuleRow, config: Config) -> list[Finding]:
     raise NotImplementedError

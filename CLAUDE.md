@@ -9,7 +9,9 @@ One principle: **the machine finds, the human decides.** No check proposes text 
 
 ## Status
 - **Build step 1 done (2026-10-06).** Ingest (docx + markdown), section kinds, segmentation, protected spans, pipeline, JSON and markdown reports. Verified on the PSJ draft and the NMS revised draft: all section kinds correct, no tool-caused sentence splits left.
-- Next: build step 2.
+- **Build step 2 done (2026-10-06).** Appendix has an `id` column (90 rows: 75 regex, 14 Python, 1 skip). Loader, regex engine, forms, registry, A6 and A7 built; 12 Python rows are registered stubs and show up as "rule X: not built yet". First false-positive count on the PSJ draft is in `local/` (git-ignored; it quotes the draft).
+- Second calibration pass applied the same day: `(verb)` / `(adverb)` qualifiers, whole-sentence A4.2, B.NOUNS as a POS row, known-terms list for A6. PSJ findings 290 → 225. B3.3 is still over 30 %: author decision pending (see `local/`).
+- Next: build step 3.
 
 ## Layout (structure fixed 2026-10-06; unbuilt bodies raise NotImplementedError)
 ```
@@ -23,8 +25,10 @@ checker/
   cli.py          run / refs / apply / stats / label-pairs / tune / comments / rules   (wired)
   ingest/         blocks (shared display filter), docx_reader, md_reader, sections,
                   segment (spaCy + boundary_guard), protect                            (done)
-  rules/          loader (appendix → RuleRow), registry (@rule id), regex_rules, forms (stubs)
-  rules/impl/     Python implementations for non-regex appendix rows                   (stubs)
+  rules/          loader (appendix → RuleRow), registry (@rule ids, stub=), regex_rules,
+                  forms (inflection/case), emit (Finding builder)                       (done)
+  rules/impl/     A6, A7, B.NOUNS (done); B9.4b, B9.7, B9.8a/b, B9.9, B.OF, B.WHILE, B.SINCE,
+                  B7.4–B7.6 (registered stubs, step 3)
   checks/         sentence (1.3), paragraph (1.4), soft (1.5), format (1.7), views (1.6)(stubs)
   refs/           entries, extract, crossref (cached), compare, orphans, check (1.9)   (stubs)
   report/         json_report, md_report (done), html_report (template TODOs, step 6), docx_comments
@@ -39,6 +43,16 @@ check_refs.py     legacy script; refs/ supersedes it. Delete once refs/ passes o
 - Section kind: named heading at any depth starts its kind; unnamed headings inherit from the nearest shallower heading. Names live in `Config.sections`.
 - Sentence starts are only allowed after terminal punctuation (`boundary_guard`), plus abbreviation and parenthesis guards. Check new drafts with the suspicious-sentence audit (short, lower-case start, no terminal punctuation); every remaining hit should be real text.
 - Unbuilt stages never make a step look clean: the markdown says "Not run" and the header says "Module A not run".
+
+## Rule table behaviour worth knowing
+- Row format `id | step | severity | action | pattern | replacement`, columns split on whitespace-pipe-whitespace. Trailing `(case-sensitive)`, `(paragraph start)`, `(verb)`, `(adverb)` qualify a regex; any other prose in the pattern makes it a Python row looked up by id.
+- `(verb)`: a token in the hit is VERB/AUX and not amod/compound; an acl (reduced clause) counts only with a "by" agent. `(adverb)`: a token is ADV. A named group `(?P<hit>…)` sets the reported span.
+- The "Known terms (A6 exemptions)" block after the appendix is an exemption list, not a term dictionary: incompleteness only costs a flag. Do not grow it into a synonym list (§4).
+- Never renumber an id: reports, decisions and calibration key on it. Retire a row instead.
+- Protected spans: replace/delete hits are dropped on any overlap; flag hits only when wholly inside one (so A2 still fires on "H1 … no difference").
+- B9.5 suppresses B9.1–B9.3 on the whole sentence. B4.1 is exempt in Introduction and Conclusion.
+- Replacement rendering lives in `rules/forms.py`: candidates (" / "), the can/could tense pair, "(s)" plurals, "lowercase", "first word only", backreferences. Every case is in `tests/fixtures/forms.csv`.
+- Python stubs use `@rule(id, stub=True)`; drop `stub=True` when the body is built.
 
 ## Conventions
 - Every check is `run(doc, config) -> list[Finding]` (views return `list[View]`, soft returns `(findings, stats)`). Checks read the Document model only; never the file.
@@ -68,7 +82,7 @@ pytest                                 # slow tests need en_core_web_lg; skip wi
 cp checker.toml.example checker.toml   # set crossref_contact before build step 7
 pip install -e ".[soft]"               # build step 4 only: sentence-transformers (pulls in PyTorch)
 ```
-Git repository initialised; nothing committed yet. Drafts, reports and decisions are git-ignored: never commit a manuscript.
+Remote: https://github.com/ElevenyChen/grammar_checker (public). Drafts, reports, decisions, `local/`, the workflow document and `advisor_comments_digest.md` are git-ignored: never commit a manuscript or private notes.
 
 Test drafts (read-only, outside the repo; copy to a scratch folder before running):
 - PSJ draft: `~/Desktop/Paper Writing/2025_Accrete and Reform_ Dual Mechanisms of Institutional Change in Online Communities.docx`

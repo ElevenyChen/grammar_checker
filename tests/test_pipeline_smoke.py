@@ -1,5 +1,5 @@
-"""End-to-end on the fixture. Step 1 definition of done: three files, report ends with
-Not checked by this tool, unbuilt stages listed instead of reported as clean.
+"""End-to-end on the fixture. Three files, report ends with Not checked by this tool, unbuilt stages listed
+instead of reported as clean, Module B withheld while Module A is open.
 EXPECTED_RULE_HITS documents what the fixture is for in later steps."""
 import json
 
@@ -32,7 +32,8 @@ def test_cli_run_writes_three_files(sample_md, nlp, tmp_path):
     data = json.loads((tmp_path / "sample.report.json").read_text())
     headings = [l for l in md.splitlines() if l.startswith("## ")]
     assert headings[-1] == "## Not checked by this tool"
-    assert "Module A not run" in md
+    assert "Module A open" in md                       # gate findings exist, none decided
+    assert "Withheld until every Module A gate finding has a decision" in md
     assert "not built yet" in md
     assert '"findings"' in html and "/*__DATA__*/null" not in html
     assert data["document"]["sentences"] and data["report"]["stats"]["sentences"] == 21

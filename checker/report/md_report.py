@@ -61,7 +61,10 @@ def _table(findings: list[Finding]) -> list[str]:
     lines = ["| sev | rule | where | evidence | suggestion | decision |",
              "|---|---|---|---|---|---|"]
     for f in findings:
-        sug = f.suggestion or (" / ".join(f.candidates) if f.candidates else "")
+        if f.action.value == "delete":
+            sug = "(delete)"
+        else:
+            sug = f.suggestion or (" / ".join(f.candidates) if f.candidates else "")
         if f.score is not None:
             sug = f"{sug} (score {f.score:.2f})".strip()
         lines.append(f"| {f.severity.value} | {f.rule_id} | {_cell(_where(f), 60)} | "
