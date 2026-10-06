@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.checker_cache/
+checker.toml
+# reports and drafts never go in the repo
+*.report.json
+*.report.md
+*.report.html
+*.docx
+decisions.json
+.DS_Store
+
+# private notes: never upload
+Paper Workflow*.md
+advisor_comments_digest.md

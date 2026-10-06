@@ -1,0 +1,30 @@
+[project]
+name = "writing-checker"
+version = "0.1.0"
+description = "Mechanical checker for the scientific writing map. The machine finds; the human decides."
+requires-python = ">=3.11"
+dependencies = [
+    "spacy>=3.7",
+    "python-docx>=1.2",
+]
+
+[project.optional-dependencies]
+soft = ["sentence-transformers>=3.0"]   # 1.5 approximate checks (build step 4); pulls in PyTorch
+dev = ["pytest>=8"]
+
+[project.scripts]
+checker = "checker.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["checker*"]
+
+[tool.setuptools.package-data]
+"checker.report" = ["templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs the spaCy model"]

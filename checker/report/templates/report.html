@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ · checker</title>
+<style>
+  /* Scope §7: two panes, large leading, short lines, three severity colours and nothing else. */
+  :root {
+    --bg: #fdfdfb; --fg: #1d1d1b; --muted: #777; --rule: #e4e3de;
+    --gate: #c0392b; --style: #d68910; --soft: #8a8a8a; --accept: #2e8b57; --current: #f3f1ea;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #16161a; --fg: #e8e6e0; --muted: #9a9a9a; --rule: #2c2c31; --current: #22222a; }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); }
+  body { display: grid; grid-template-columns: minmax(0, 1fr) 420px; grid-template-rows: auto 1fr; font-family: var(--sans); }
+  header { grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: baseline; padding: .6rem 1.25rem; border-bottom: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+  header b { color: var(--fg); }
+  header .spacer { flex: 1; }
+  header button { font: inherit; padding: .25rem .6rem; }
+  #text { overflow-y: auto; padding: 2rem 3rem 50vh; font-family: var(--serif); font-size: 18px; line-height: 1.65; }
+  #text .para { max-width: 65ch; margin: 0 0 1.4em; padding-left: .9rem; border-left: 3px solid transparent; }
+  #text .para.current { border-left-color: var(--fg); background: var(--current); }
+  #text .heading { font-family: var(--sans); font-weight: 600; font-size: 15px; letter-spacing: .02em; color: var(--muted); margin-top: 2.5em; }
+  #text .hit { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer; }
+  .sev-gate  { text-decoration-color: var(--gate); }
+  .sev-style { text-decoration-color: var(--style); }
+  .sev-soft  { text-decoration-color: var(--soft); }
+  .hit.decided-accept, .hit.decided-pick, .hit.decided-delete { text-decoration-color: var(--accept); }
+  .hit.decided-skip, .hit.decided-seen { text-decoration-color: var(--rule); opacity: .75; }
+  .hit.focus { background: var(--current); outline: 2px solid var(--fg); outline-offset: 2px; }
+  #panel { overflow-y: auto; border-left: 1px solid var(--rule); padding: 1rem 1rem 50vh; font-size: 14px; line-height: 1.5; }
+  #panel .section-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; margin: .5rem 0; }
+  .finding { display: grid; grid-template-columns: 10px 1fr; gap: .6rem; padding: .45rem .4rem; border-radius: 4px; cursor: pointer; }
+  .finding.focus { background: var(--current); }
+  .finding .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: .4em; }
+  .dot.gate { background: var(--gate); } .dot.style { background: var(--style); } .dot.soft { background: var(--soft); }
+  .finding .rule { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); margin-right: .5rem; }
+  .finding .evidence { font-family: var(--serif); }
+  .finding .suggestion { color: var(--muted); }
+  .finding .suggestion::before { content: " · "; }
+  .finding .state { font-size: 12px; color: var(--accept); margin-left: .4rem; }
+  .finding.decided-skip .state, .finding.decided-seen .state { color: var(--muted); }
+  .finding.decided-skip, .finding.decided-seen { opacity: .6; }
+  #panel details summary { cursor: pointer; color: var(--muted); margin: 1rem 0 .5rem; }
+  #panel .hidden-b { color: var(--muted); font-style: italic; padding: .5rem .4rem; }
+  .pick { margin: .2rem 0 0 1.4rem; }
+  .pick button { font: inherit; margin-right: .3rem; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid var(--rule); border-radius: 3px; padding: 0 .3em; }
+  #help { font-size: 12px; color: var(--muted); }
+  body.focus-mode .finding:not(.focus) { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <b id="title">__TITLE__</b>
+  <span id="counts"></span>
+  <span id="help">
+    <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>a</kbd> accept · <kbd>s</kbd> skip · <kbd>d</kbd> delete · <kbd>1-9</kbd> pick · <kbd>f</kbd> focus mode
+  </span>
+  <span class="spacer"></span>
+  <button id="export">Export decisions.json</button>
+</header>
+<main id="text" aria-label="draft"></main>
+<aside id="panel" aria-label="findings"></aside>
+
+<script id="data" type="application/json">/*__DATA__*/null</script>
+<script>
+/*
+ Decision panel (scope §7). Reads the inlined payload; never edits text.
+ Structure only — fill in the TODOs in build step 6.
+
+ payload = { report: {findings[], not_checked[], views[], stats, module_a_cleared},
+             document: {source, text, paragraphs[], sentences[]} }
+ State: decisions = { [finding.id]: {id, rule_id, location, evidence, proposed, choice, picked, time} }
+        persisted to localStorage under key "checker:" + document.source; exported as decisions.json.
+*/
+const payload = JSON.parse(document.getElementById('data').textContent);
+const STORAGE_KEY = 'checker:' + (payload?.document?.source || 'draft');
+
+const state = {
+  findings: [],          // ordered as the panel shows them (A first, then B, then soft)
+  byParagraph: new Map(),// paragraph index -> [finding]
+  decisions: loadDecisions(),
+  cursor: -1,            // index into state.findings
+  currentParagraph: 0,
+};
+
+function loadDecisions() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { return {}; }
+}
+function saveDecisions() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.decisions)); } catch (e) { /* private mode */ }
+}
+
+// ---- rendering --------------------------------------------------------------------------
+function moduleAcleared() {
+  // every gate finding in module A has a decision (mirrors checker.decisions.module_a_cleared)
+  return state.findings.filter(f => f.module === 'A' && f.severity === 'gate')
+                       .every(f => state.decisions[f.id]);
+}
+
+function renderText() {
+  // TODO: for each document.paragraph, emit <div class="para" data-p=idx>; headings get .heading.
+  // Within a paragraph, split the text at finding spans (sorted, non-overlapping; drop nested
+  // hits in favour of the earlier one) and wrap each in <span class="hit sev-X" data-id=...>.
+  // Module B hits are rendered but not underlined until moduleAcleared() unless ?all=1.
+}
+
+function renderPanel() {
+  // TODO: findings for state.currentParagraph, one .finding line each:
+  //   <div class="finding" data-id><span class="dot sev"></span><span><span class="rule">B1.3</span>
+  //   <span class="evidence">in order to</span><span class="suggestion">to</span><span class="state">accepted</span></span></div>
+  // Module B lines live inside <details> that stays closed with a .hidden-b note until moduleAcleared().
+  // Pick rows add a .pick row of numbered buttons. Soft band last with its score.
+}
+
+function renderCounts() {
+  // TODO: "A 12 (3 open) · B 41 · soft 6" and a stale-decision note from report.stats.
+}
+
+// ---- navigation --------------------------------------------------------------------------
+function setCurrentParagraph(idx) { state.currentParagraph = idx; /* TODO: toggle .current, renderPanel() */ }
+
+function observeParagraphs() {
+  // TODO: IntersectionObserver on #text .para; the paragraph with the largest visible ratio
+  // nearest the top third of the viewport becomes current.
+}
+
+function focusFinding(i) {
+  // TODO: set state.cursor; scroll #text to the hit span (block: 'center'), flash .focus on both
+  // the span and the panel line; setCurrentParagraph if needed.
+}
+
+function next() { focusFinding(Math.min(state.cursor + 1, state.findings.length - 1)); }
+function prev() { focusFinding(Math.max(state.cursor - 1, 0)); }
+
+// ---- decisions ---------------------------------------------------------------------------
+function decide(finding, choice, picked) {
+  // Allowed: replace/delete rows -> accept|skip|pick; flag rows -> seen, or delete when can_delete.
+  // TODO: validate against finding.action / finding.can_delete / finding.candidates; store
+  // {id, rule_id, location, evidence, proposed: finding.suggestion, choice, picked, time: ISO};
+  // saveDecisions(); update classes on the span and the line; renderCounts(); advance to next().
+}
+
+function exportDecisions() {
+  const blob = new Blob([JSON.stringify({source: payload.document.source, decisions: Object.values(state.decisions)}, null, 1)],
+                        {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'decisions.json'; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---- keyboard ----------------------------------------------------------------------------
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const f = state.findings[state.cursor];
+  switch (e.key) {
+    case 'j': case 'ArrowDown': next(); break;
+    case 'k': case 'ArrowUp': prev(); break;
+    case 'a': if (f) decide(f, 'accept'); break;
+    case 's': if (f) decide(f, f.action === 'flag' ? 'seen' : 'skip'); break;
+    case 'd': if (f && (f.action === 'delete' || f.can_delete)) decide(f, 'delete'); break;
+    case 'f': document.body.classList.toggle('focus-mode'); break;
+    default:
+      if (f && /^[1-9]$/.test(e.key) && f.candidates && f.candidates[+e.key - 1]) decide(f, 'pick', f.candidates[+e.key - 1]);
+      else return;
+  }
+  e.preventDefault();
+});
+
+document.getElementById('export').addEventListener('click', exportDecisions);
+
+// ---- boot --------------------------------------------------------------------------------
+(function boot() {
+  if (!payload) { document.getElementById('text').textContent = 'No data inlined.'; return; }
+  state.findings = orderFindings(payload.report.findings);
+  for (const f of state.findings) {
+    const p = f.location.paragraph;
+    if (!state.byParagraph.has(p)) state.byParagraph.set(p, []);
+    state.byParagraph.get(p).push(f);
+  }
+  renderText(); observeParagraphs(); renderPanel(); renderCounts();
+})();
+
+function orderFindings(fs) {
+  const mod = f => f.module === 'A' ? 0 : f.severity === 'soft' ? 2 : 1;
+  return [...fs].sort((a, b) => mod(a) - mod(b) || a.location.start - b.location.start);
+}
+</script>
+</body>
+</html>
